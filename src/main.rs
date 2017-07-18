@@ -1,10 +1,7 @@
 extern crate clang_sys;
 
 use std::env;
-use std::ffi::CStr;
-use std::ffi::CString;
-use std::ptr;
-use std::str;
+use std::ffi;
 
 struct Options {
     path: String,
@@ -59,8 +56,8 @@ fn print_options(options: &Options) {
     println!("file: {}", options.file);
 }
 
-fn cstring_from_string(s: String) -> CString {
-    CString::new(s).unwrap()
+fn cstring_from_string(s: String) -> ffi::CString {
+    ffi::CString::new(s).unwrap()
 }
 
 fn i32_from_usize(x: usize) -> i32 {
@@ -68,6 +65,40 @@ fn i32_from_usize(x: usize) -> i32 {
         x as i32
     } else {
         panic!("Conversion failed.");
+    }
+}
+
+mod juice {
+
+    extern crate clang_sys;
+
+    use std::ffi;
+    use std::os::raw;
+
+    pub struct String {
+        cxstr: clang_sys::CXString,
+    }
+
+    impl String {
+        pub fn from(s: clang_sys::CXString) -> String {
+            String { cxstr: s }
+        }
+
+        pub unsafe fn as_ptr(&self) -> *const raw::c_char {
+            clang_sys::clang_getCString(self.cxstr)
+        }
+
+        pub unsafe fn as_cstr(&self) -> &ffi::CStr {
+            ffi::CStr::from_ptr(self.as_ptr())
+        }
+    }
+
+    impl Drop for String {
+        fn drop(&mut self) {
+            unsafe {
+                clang_sys::clang_disposeString(self.cxstr);
+            }
+        }
     }
 }
 
@@ -83,17 +114,15 @@ pub extern "C" fn visit_cursor(
 
         if clang_sys::clang_isDeclaration(cursor_kind) != 0 {
 
-            let display_name_cxstring = clang_sys::clang_getCursorDisplayName(cursor);
-            let display_name_ptr = clang_sys::clang_getCString(display_name_cxstring);
-            let display_name_cstr = CStr::from_ptr(display_name_ptr);
+            let display_name_jstr =
+                juice::String::from(clang_sys::clang_getCursorDisplayName(cursor));
+            let display_name_cstr = display_name_jstr.as_cstr();
 
             if let Ok(display_name) = display_name_cstr.to_str() {
                 println!("{}", display_name);
             } else {
                 println!("<unknown>");
             }
-
-            clang_sys::clang_disposeString(display_name_cxstring);
         }
 
         clang_sys::CXChildVisit_Continue
@@ -113,7 +142,7 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
 
     unsafe {
         let index = clang_sys::clang_createIndex(1, 1);
-        let mut trans_unit: clang_sys::CXTranslationUnit = ptr::null_mut();
+        let mut trans_unit: clang_sys::CXTranslationUnit = std::ptr::null_mut();
 
         println!("Parsing source file...");
 
@@ -122,14 +151,14 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
             source_file_cstr.as_ptr(),
             clang_args_ptr_vec.as_ptr(),
             i32_from_usize(clang_args.len()),
-            ptr::null_mut(),
+            std::ptr::null_mut(),
             0,
             clang_sys::CXTranslationUnit_SkipFunctionBodies,
             &mut trans_unit,
         );
 
         let cursor = clang_sys::clang_getTranslationUnitCursor(trans_unit);
-        clang_sys::clang_visitChildren(cursor, visit_cursor, ptr::null_mut());
+        clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
 
         clang_sys::clang_disposeTranslationUnit(trans_unit);
         clang_sys::clang_disposeIndex(index);
