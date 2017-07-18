@@ -1,12 +1,23 @@
 extern crate clang_sys;
 
 use std::env;
+use std::ffi::CStr;
 use std::ffi::CString;
 use std::ptr;
+use std::str;
 
 struct Options {
     path: String,
     file: String,
+}
+
+impl Options {
+    fn new() -> Options {
+        Options {
+            path: String::from(""),
+            file: String::from(""),
+        }
+    }
 }
 
 fn parse_command_line() -> Result<Options, String> {
@@ -26,10 +37,7 @@ fn parse_command_line() -> Result<Options, String> {
         }
     }
 
-    let mut options = Options {
-        path: String::from(""),
-        file: String::from(""),
-    };
+    let mut options = Options::new();
 
     if let Some(path) = path_arg {
         options.path = path;
@@ -63,19 +71,49 @@ fn i32_from_usize(x: usize) -> i32 {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn visit_cursor(
+    cursor: clang_sys::CXCursor,
+    _: clang_sys::CXCursor,
+    _: clang_sys::CXClientData,
+) -> clang_sys::CXVisitorResult {
+
+    unsafe {
+        let cursor_kind = clang_sys::clang_getCursorKind(cursor);
+
+        if clang_sys::clang_isDeclaration(cursor_kind) != 0 {
+
+            let display_name_cxstring = clang_sys::clang_getCursorDisplayName(cursor);
+            let display_name_ptr = clang_sys::clang_getCString(display_name_cxstring);
+            let display_name_cstr = CStr::from_ptr(display_name_ptr);
+
+            if let Ok(display_name) = display_name_cstr.to_str() {
+                println!("{}", display_name);
+            } else {
+                println!("<unknown>");
+            }
+
+            clang_sys::clang_disposeString(display_name_cxstring);
+        }
+
+        clang_sys::CXChildVisit_Continue
+    }
+}
+
 fn parse_source_file(source_file: String) -> Result<(), String> {
 
     let source_file_cstr = cstring_from_string(source_file);
 
-    let clang_args_str = ""; 
+    let clang_args_str = "";
     let clang_args: Vec<_> = clang_args_str.split_whitespace().collect();
-    let clang_args_cstr = clang_args.iter().map(|s| cstring_from_string(s.to_string()));
+    let clang_args_cstr = clang_args.iter().map(
+        |s| cstring_from_string(s.to_string()),
+    );
     let clang_args_ptr_vec: Vec<_> = clang_args_cstr.map(|s| s.as_ptr()).collect();
 
     unsafe {
         let index = clang_sys::clang_createIndex(1, 1);
         let mut trans_unit: clang_sys::CXTranslationUnit = ptr::null_mut();
-        let mut unsaved_file = clang_sys::CXUnsavedFile::default();
 
         println!("Parsing source file...");
 
@@ -84,11 +122,14 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
             source_file_cstr.as_ptr(),
             clang_args_ptr_vec.as_ptr(),
             i32_from_usize(clang_args.len()),
-            &mut unsaved_file,
+            ptr::null_mut(),
             0,
             clang_sys::CXTranslationUnit_SkipFunctionBodies,
             &mut trans_unit,
         );
+
+        let cursor = clang_sys::clang_getTranslationUnitCursor(trans_unit);
+        clang_sys::clang_visitChildren(cursor, visit_cursor, ptr::null_mut());
 
         clang_sys::clang_disposeTranslationUnit(trans_unit);
         clang_sys::clang_disposeIndex(index);
@@ -108,12 +149,18 @@ fn main() {
     println!("This is little!");
 
     let options = match parse_command_line() {
-        Ok(options) => { print_options(&options); options },
-        Err(err) => { println!("Error: {}", err); return }
+        Ok(options) => {
+            print_options(&options);
+            options
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+            return;
+        }
     };
 
     match parse_source_file(options.file) {
         Ok(_) => println!("Success."),
-        Err(err) => println!("Error: {}", err)
+        Err(err) => println!("Error: {}", err),
     };
 }
