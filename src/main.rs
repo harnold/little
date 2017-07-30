@@ -3,18 +3,10 @@ extern crate clang_sys;
 use std::env;
 use std::ffi;
 
+#[derive(Debug, Default)]
 struct Options {
     path: String,
     file: String,
-}
-
-impl Options {
-    fn new() -> Options {
-        Options {
-            path: String::from(""),
-            file: String::from(""),
-        }
-    }
 }
 
 fn parse_command_line() -> Result<Options, String> {
@@ -34,7 +26,7 @@ fn parse_command_line() -> Result<Options, String> {
         }
     }
 
-    let mut options = Options::new();
+    let mut options = Options::default();
 
     if let Some(path) = path_arg {
         options.path = path;
