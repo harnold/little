@@ -173,6 +173,35 @@ pub mod juice {
             }
         }
     }
+
+    pub mod tu {
+
+        extern crate clang_sys;
+
+        use std;
+
+        pub struct TranslationUnit {
+            cx_translation_unit: clang_sys::CXTranslationUnit
+        }
+
+        impl TranslationUnit {
+            pub fn new() -> TranslationUnit {
+                TranslationUnit { cx_translation_unit: std::ptr::null_mut() }
+            }
+
+            pub fn as_cx_translation_unit(&self) -> clang_sys::CXTranslationUnit {
+                self.cx_translation_unit
+            }
+
+            pub fn as_mut_cx_translation_unit(&mut self) -> &mut clang_sys::CXTranslationUnit {
+                &mut self.cx_translation_unit
+            }
+        }
+
+        impl Drop for TranslationUnit {
+            fn drop(&mut self) {
+                unsafe {
+                    clang_sys::clang_disposeTranslationUnit(self.cx_translation_unit);
                 }
             }
         }
@@ -221,9 +250,9 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
         juice::index::EXCLUDE_DECLARATIONS_FROM_PCH |
         juice::index::DISPLAY_DIAGNOSTICS);
 
-    unsafe {
-        let mut trans_unit: clang_sys::CXTranslationUnit = std::ptr::null_mut();
+    let mut trans_unit = juice::tu::TranslationUnit::new();
 
+    unsafe {
         println!("Parsing source file...");
 
         let result = clang_sys::clang_parseTranslationUnit2(
@@ -234,13 +263,11 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
             std::ptr::null_mut(),
             0,
             clang_sys::CXTranslationUnit_SkipFunctionBodies,
-            &mut trans_unit,
+            trans_unit.as_mut_cx_translation_unit()
         );
 
-        let cursor = clang_sys::clang_getTranslationUnitCursor(trans_unit);
+        let cursor = clang_sys::clang_getTranslationUnitCursor(trans_unit.as_cx_translation_unit());
         clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
-
-        clang_sys::clang_disposeTranslationUnit(trans_unit);
 
         let error_code = juice::ErrorCode::from(result);
 
