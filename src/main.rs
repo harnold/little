@@ -99,7 +99,8 @@ mod juice {
         Failure,
         Crashed,
         InvalidArguments,
-        ASTReadError
+        ASTReadError,
+        UnknownError,
     }
 
     impl ErrorCode {
@@ -110,7 +111,18 @@ mod juice {
                 clang_sys::CXError_Crashed => ErrorCode::Crashed,
                 clang_sys::CXError_InvalidArguments => ErrorCode::InvalidArguments,
                 clang_sys::CXError_ASTReadError => ErrorCode::ASTReadError,
-                _ => panic!("Invalid CXErrorCode.")
+                _ => ErrorCode::UnknownError,
+            }
+        }
+
+        pub fn description(&self) -> &str {
+            match *self {
+                ErrorCode::Success => "Success.",
+                ErrorCode::Failure => "Generic error code.",
+                ErrorCode::Crashed => "libclang crashed.",
+                ErrorCode::InvalidArguments => "Invalid arguments.",
+                ErrorCode::ASTReadError => "AST deserialization error.",
+                ErrorCode::UnknownError => "Unknown error.",
             }
         }
     }
@@ -177,12 +189,11 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
         clang_sys::clang_disposeTranslationUnit(trans_unit);
         clang_sys::clang_disposeIndex(index);
 
-        match juice::ErrorCode::from(result) {
+        let error_code = juice::ErrorCode::from(result);
+
+        match error_code {
             juice::ErrorCode::Success => Ok(()),
-            juice::ErrorCode::Failure => Err(String::from("Failure.")),
-            juice::ErrorCode::Crashed => Err(String::from("Crashed.")),
-            juice::ErrorCode::InvalidArguments => Err(String::from("Invalid arguments.")),
-            juice::ErrorCode::ASTReadError => Err(String::from("AST read error."))
+            _ => Err(String::from(error_code.description())),
         }
     }
 }
