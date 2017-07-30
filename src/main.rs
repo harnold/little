@@ -60,11 +60,11 @@ fn cstring_from_string(s: String) -> ffi::CString {
     ffi::CString::new(s).unwrap()
 }
 
-fn i32_from_usize(x: usize) -> i32 {
+fn i32_try_from_usize(x: usize) -> Result<i32, String> {
     if x <= i32::max_value() as usize {
-        x as i32
+        Ok(x as i32)
     } else {
-        panic!("Conversion failed.");
+        Err(String::from("Conversion failed."))
     }
 }
 
@@ -150,7 +150,7 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
             index,
             source_file_cstr.as_ptr(),
             clang_args_ptr_vec.as_ptr(),
-            i32_from_usize(clang_args.len()),
+            i32_try_from_usize(clang_args.len()).unwrap(),
             std::ptr::null_mut(),
             0,
             clang_sys::CXTranslationUnit_SkipFunctionBodies,
