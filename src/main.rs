@@ -92,6 +92,28 @@ mod juice {
             }
         }
     }
+
+    #[derive(Debug)]
+    pub enum ErrorCode {
+        Success,
+        Failure,
+        Crashed,
+        InvalidArguments,
+        ASTReadError
+    }
+
+    impl ErrorCode {
+        pub fn from(e: clang_sys::CXErrorCode) -> ErrorCode {
+            match e {
+                clang_sys::CXError_Success => ErrorCode::Success,
+                clang_sys::CXError_Failure => ErrorCode::Failure,
+                clang_sys::CXError_Crashed => ErrorCode::Crashed,
+                clang_sys::CXError_InvalidArguments => ErrorCode::InvalidArguments,
+                clang_sys::CXError_ASTReadError => ErrorCode::ASTReadError,
+                _ => panic!("Invalid CXErrorCode.")
+            }
+        }
+    }
 }
 
 #[no_mangle]
@@ -155,13 +177,12 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
         clang_sys::clang_disposeTranslationUnit(trans_unit);
         clang_sys::clang_disposeIndex(index);
 
-        match result {
-            clang_sys::CXError_Success => Ok(()),
-            clang_sys::CXError_Failure => Err(String::from("Failure.")),
-            clang_sys::CXError_Crashed => Err(String::from("Crashed.")),
-            clang_sys::CXError_InvalidArguments => Err(String::from("Invalid arguments.")),
-            clang_sys::CXError_ASTReadError => Err(String::from("AST read error.")),
-            _ => Err(String::from("Unknown error.")),
+        match juice::ErrorCode::from(result) {
+            juice::ErrorCode::Success => Ok(()),
+            juice::ErrorCode::Failure => Err(String::from("Failure.")),
+            juice::ErrorCode::Crashed => Err(String::from("Crashed.")),
+            juice::ErrorCode::InvalidArguments => Err(String::from("Invalid arguments.")),
+            juice::ErrorCode::ASTReadError => Err(String::from("AST read error."))
         }
     }
 }
