@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate bitflags;
 extern crate clang_sys;
 
 use std::env;
@@ -60,7 +62,7 @@ fn i32_try_from_usize(x: usize) -> Result<i32, String> {
     }
 }
 
-mod juice {
+pub mod juice {
 
     extern crate clang_sys;
 
@@ -68,7 +70,7 @@ mod juice {
     use std::os::raw;
 
     pub struct String {
-        cxstr: clang_sys::CXString,
+        cxstr: clang_sys::CXString
     }
 
     impl String {
@@ -126,6 +128,51 @@ mod juice {
             }
         }
     }
+
+    pub mod index {
+
+        extern crate clang_sys;
+
+        bitflags! {
+            pub struct Options: u32 {
+                const EXCLUDE_DECLARATIONS_FROM_PCH = 0b00000001;
+                const DISPLAY_DIAGNOSTICS           = 0b00000010;
+            }
+        }
+
+        pub struct Index {
+            cxindex: clang_sys::CXIndex
+        }
+
+        impl Index {
+            pub fn new(o: Options) -> Index {
+                let exclude_decls_from_pch =
+                    if o.contains(EXCLUDE_DECLARATIONS_FROM_PCH) { 1 } else { 0 };
+                let display_diagnostics =
+                    if o.contains(DISPLAY_DIAGNOSTICS) { 1 } else { 0 };
+
+                unsafe {
+                    Index {
+                        cxindex: clang_sys::clang_createIndex(
+                            exclude_decls_from_pch,
+                            display_diagnostics)
+                    }
+                }
+            }
+
+            pub fn as_cxindex(&self) -> clang_sys::CXIndex {
+                self.cxindex
+            }
+        }
+
+        impl Drop for Index {
+            fn drop(&mut self) {
+                unsafe {
+                    clang_sys::clang_disposeIndex(self.cxindex);
+                }
+            }
+        }
+    }
 }
 
 #[no_mangle]
@@ -166,14 +213,17 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
     );
     let clang_args_ptr_vec: Vec<_> = clang_args_cstr.map(|s| s.as_ptr()).collect();
 
+    let index = juice::index::Index::new(
+        juice::index::EXCLUDE_DECLARATIONS_FROM_PCH |
+        juice::index::DISPLAY_DIAGNOSTICS);
+
     unsafe {
-        let index = clang_sys::clang_createIndex(1, 1);
         let mut trans_unit: clang_sys::CXTranslationUnit = std::ptr::null_mut();
 
         println!("Parsing source file...");
 
         let result = clang_sys::clang_parseTranslationUnit2(
-            index,
+            index.as_cxindex(),
             source_file_cstr.as_ptr(),
             clang_args_ptr_vec.as_ptr(),
             i32_try_from_usize(clang_args.len()).unwrap(),
@@ -187,7 +237,6 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
         clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
 
         clang_sys::clang_disposeTranslationUnit(trans_unit);
-        clang_sys::clang_disposeIndex(index);
 
         let error_code = juice::ErrorCode::from(result);
 
