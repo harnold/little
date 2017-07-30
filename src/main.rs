@@ -70,16 +70,16 @@ pub mod juice {
     use std::os::raw;
 
     pub struct String {
-        cxstr: clang_sys::CXString
+        cx_str: clang_sys::CXString
     }
 
     impl String {
         pub fn from(s: clang_sys::CXString) -> String {
-            String { cxstr: s }
+            String { cx_str: s }
         }
 
         pub unsafe fn as_ptr(&self) -> *const raw::c_char {
-            clang_sys::clang_getCString(self.cxstr)
+            clang_sys::clang_getCString(self.cx_str)
         }
 
         pub unsafe fn as_cstr(&self) -> &ffi::CStr {
@@ -90,7 +90,7 @@ pub mod juice {
     impl Drop for String {
         fn drop(&mut self) {
             unsafe {
-                clang_sys::clang_disposeString(self.cxstr);
+                clang_sys::clang_disposeString(self.cx_str);
             }
         }
     }
@@ -141,11 +141,11 @@ pub mod juice {
         }
 
         pub struct Index {
-            cxindex: clang_sys::CXIndex
+            cx_index: clang_sys::CXIndex
         }
 
         impl Index {
-            pub fn new(o: Options) -> Index {
+            pub fn create(o: Options) -> Index {
                 let exclude_decls_from_pch =
                     if o.contains(EXCLUDE_DECLARATIONS_FROM_PCH) { 1 } else { 0 };
                 let display_diagnostics =
@@ -153,22 +153,26 @@ pub mod juice {
 
                 unsafe {
                     Index {
-                        cxindex: clang_sys::clang_createIndex(
+                        cx_index: clang_sys::clang_createIndex(
                             exclude_decls_from_pch,
                             display_diagnostics)
                     }
                 }
             }
 
-            pub fn as_cxindex(&self) -> clang_sys::CXIndex {
-                self.cxindex
+            pub fn as_cx_index(&self) -> clang_sys::CXIndex {
+                self.cx_index
             }
         }
 
         impl Drop for Index {
             fn drop(&mut self) {
                 unsafe {
-                    clang_sys::clang_disposeIndex(self.cxindex);
+                    clang_sys::clang_disposeIndex(self.cx_index);
+                }
+            }
+        }
+    }
                 }
             }
         }
@@ -213,7 +217,7 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
     );
     let clang_args_ptr_vec: Vec<_> = clang_args_cstr.map(|s| s.as_ptr()).collect();
 
-    let index = juice::index::Index::new(
+    let index = juice::index::Index::create(
         juice::index::EXCLUDE_DECLARATIONS_FROM_PCH |
         juice::index::DISPLAY_DIAGNOSTICS);
 
@@ -223,7 +227,7 @@ fn parse_source_file(source_file: String) -> Result<(), String> {
         println!("Parsing source file...");
 
         let result = clang_sys::clang_parseTranslationUnit2(
-            index.as_cxindex(),
+            index.as_cx_index(),
             source_file_cstr.as_ptr(),
             clang_args_ptr_vec.as_ptr(),
             i32_try_from_usize(clang_args.len()).unwrap(),
