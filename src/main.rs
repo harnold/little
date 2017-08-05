@@ -50,18 +50,6 @@ fn print_options(options: &Options) {
     println!("file: {}", options.file);
 }
 
-fn cstring_from_string(s: String) -> ffi::CString {
-    ffi::CString::new(s).unwrap()
-}
-
-fn i32_try_from_usize(x: usize) -> Result<i32, String> {
-    if x <= i32::max_value() as usize {
-        Ok(x as i32)
-    } else {
-        Err(String::from("Conversion failed."))
-    }
-}
-
 pub mod juice;
 
 #[no_mangle]
@@ -91,45 +79,34 @@ pub extern "C" fn visit_cursor(
     }
 }
 
-fn parse_source_file(source_file: String) -> Result<(), String> {
-
-    let source_file_cstr = cstring_from_string(source_file);
+fn parse_source_file(source_filename: String) -> Result<(), String> {
 
     let clang_args_str = "";
     let clang_args: Vec<_> = clang_args_str.split_whitespace().collect();
-    let clang_args_cstr = clang_args.iter().map(
-        |s| cstring_from_string(s.to_string()),
-    );
-    let clang_args_ptr_vec: Vec<_> = clang_args_cstr.map(|s| s.as_ptr()).collect();
 
     let index = juice::index::Index::create(
         juice::index::EXCLUDE_DECLARATIONS_FROM_PCH |
         juice::index::DISPLAY_DIAGNOSTICS);
 
-    let mut trans_unit = juice::tu::TranslationUnit::new();
+    println!("Parsing source file...");
 
-    unsafe {
-        println!("Parsing source file...");
+    let result = juice::tu::TranslationUnit::parse(
+        &index,
+        &source_filename,
+        clang_args,
+        juice::tu::SKIP_FUNCTION_BODIES
+    );
 
-        let result = clang_sys::clang_parseTranslationUnit2(
-            index.as_cx_index(),
-            source_file_cstr.as_ptr(),
-            clang_args_ptr_vec.as_ptr(),
-            i32_try_from_usize(clang_args.len()).unwrap(),
-            std::ptr::null_mut(),
-            0,
-            clang_sys::CXTranslationUnit_SkipFunctionBodies,
-            trans_unit.as_mut_cx_translation_unit()
-        );
-
-        let cursor = clang_sys::clang_getTranslationUnitCursor(trans_unit.as_cx_translation_unit());
-        clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
-
-        let error_code = juice::ErrorCode::from(result);
-
-        match error_code {
-            juice::ErrorCode::Success => Ok(()),
-            _ => Err(String::from(error_code.description())),
+    match result {
+        Ok(tu) => {
+            unsafe {
+                let cursor = clang_sys::clang_getTranslationUnitCursor(tu.as_ptr());
+                clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
+            }
+            Ok(())
+        },
+        Err(error_code) => {
+            Err(String::from(error_code.description()))
         }
     }
 }
