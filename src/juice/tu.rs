@@ -54,7 +54,7 @@ impl TranslationUnit {
 
         unsafe {
             let result = clang_sys::clang_parseTranslationUnit2(
-                index.as_cx_index(),
+                index.as_ptr(),
                 source_filename_cstr.as_ptr(),
                 command_line_args_ptr_vec.as_ptr(),
                 util::i32_from_usize(command_line_args_ptr_vec.len()),

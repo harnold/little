@@ -8,7 +8,7 @@ bitflags! {
 }
 
 pub struct Index {
-    cx_index: clang_sys::CXIndex,
+    ptr: clang_sys::CXIndex
 }
 
 impl Index {
@@ -20,22 +20,22 @@ impl Index {
 
         unsafe {
             Index {
-                cx_index: clang_sys::clang_createIndex(
+                ptr: clang_sys::clang_createIndex(
                     exclude_decls_from_pch,
                     display_diagnostics)
             }
         }
     }
 
-    pub fn as_cx_index(&self) -> clang_sys::CXIndex {
-        self.cx_index
+    pub fn as_ptr(&self) -> clang_sys::CXIndex {
+        self.ptr
     }
 }
 
 impl Drop for Index {
     fn drop(&mut self) {
         unsafe {
-            clang_sys::clang_disposeIndex(self.cx_index);
+            clang_sys::clang_disposeIndex(self.ptr);
         }
     }
 }
