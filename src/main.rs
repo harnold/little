@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate bitflags;
 extern crate clang_sys;
+extern crate libc;
 
 use std::env;
 use std::ffi;

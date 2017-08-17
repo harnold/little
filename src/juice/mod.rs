@@ -3,15 +3,15 @@ pub mod tu;
 mod util;
 
 use clang_sys;
+use libc;
 use std::ffi;
-use std::os::raw;
 
 pub struct String {
     ptr: clang_sys::CXString
 }
 
 impl String {
-    pub unsafe fn as_ptr(&self) -> *const raw::c_char {
+    pub unsafe fn as_ptr(&self) -> *const libc::c_char {
         clang_sys::clang_getCString(self.ptr)
     }
 
