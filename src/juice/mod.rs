@@ -1,3 +1,4 @@
+pub mod cursor;
 pub mod index;
 pub mod tu;
 mod util;
@@ -5,31 +6,41 @@ mod util;
 use clang_sys;
 use libc;
 use std::ffi;
+use std::str;
 
 pub struct String {
-    ptr: clang_sys::CXString
+    obj: clang_sys::CXString
 }
 
 impl String {
     pub unsafe fn as_ptr(&self) -> *const libc::c_char {
-        clang_sys::clang_getCString(self.ptr)
+        clang_sys::clang_getCString(self.obj)
     }
 
-    pub unsafe fn as_cstr(&self) -> &ffi::CStr {
-        ffi::CStr::from_ptr(self.as_ptr())
+    pub fn as_cstr(&self) -> &ffi::CStr {
+        unsafe {
+            ffi::CStr::from_ptr(self.as_ptr())
+        }
+    }
+
+    pub fn to_str(&self) -> &str {
+        match self.as_cstr().to_str() {
+            Ok(s) => s,
+            Err(_) => "<Utf8Error>"
+        }
     }
 }
 
 impl From<clang_sys::CXString> for String {
     fn from(s: clang_sys::CXString) -> String {
-        String { ptr: s }
+        String { obj: s }
     }
 }
 
 impl Drop for String {
     fn drop(&mut self) {
         unsafe {
-            clang_sys::clang_disposeString(self.ptr);
+            clang_sys::clang_disposeString(self.obj);
         }
     }
 }
