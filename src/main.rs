@@ -3,8 +3,8 @@ extern crate bitflags;
 extern crate clang_sys;
 extern crate libc;
 
+use std::any::Any;
 use std::env;
-use std::ffi;
 
 #[derive(Debug, Default)]
 struct Options {
@@ -43,7 +43,7 @@ fn parse_command_line() -> Result<Options, String> {
         return Err(String::from("No file specified (`--file')."));
     }
 
-    return Ok(options);
+    Ok(options)
 }
 
 fn print_options(options: &Options) {
@@ -53,31 +53,20 @@ fn print_options(options: &Options) {
 
 pub mod juice;
 
-#[no_mangle]
-pub extern "C" fn visit_cursor(
-    cursor: clang_sys::CXCursor,
-    _: clang_sys::CXCursor,
-    _: clang_sys::CXClientData,
-) -> clang_sys::CXVisitorResult {
+struct EmptyData {}
 
-    unsafe {
-        let cursor_kind = clang_sys::clang_getCursorKind(cursor);
+fn print_declaration(
+    cursor: juice::cursor::Cursor,
+    _: juice::cursor::Cursor,
+    _: &mut Any
+) -> juice::cursor::ChildVisitResult {
 
-        if clang_sys::clang_isDeclaration(cursor_kind) != 0 {
-
-            let display_name_jstr =
-                juice::String::from(clang_sys::clang_getCursorDisplayName(cursor));
-            let display_name_cstr = display_name_jstr.as_cstr();
-
-            if let Ok(display_name) = display_name_cstr.to_str() {
-                println!("{}", display_name);
-            } else {
-                println!("<unknown>");
-            }
-        }
-
-        clang_sys::CXChildVisit_Continue
+    if cursor.kind().is_declaration() {
+        let display_name = cursor.display_name();
+        println!("{}", display_name.to_str());
     }
+
+    juice::cursor::ChildVisitResult::Continue
 }
 
 fn parse_source_file(source_filename: String) -> Result<(), String> {
@@ -100,10 +89,9 @@ fn parse_source_file(source_filename: String) -> Result<(), String> {
 
     match result {
         Ok(tu) => {
-            unsafe {
-                let cursor = clang_sys::clang_getTranslationUnitCursor(tu.as_ptr());
-                clang_sys::clang_visitChildren(cursor, visit_cursor, std::ptr::null_mut());
-            }
+            let cursor = tu.get_cursor();
+            let mut data = EmptyData {};
+            cursor.visit_children(print_declaration, &mut data);
             Ok(())
         },
         Err(error_code) => {

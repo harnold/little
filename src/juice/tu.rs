@@ -1,4 +1,5 @@
 use juice;
+use juice::cursor;
 use juice::index;
 use juice::util;
 
@@ -52,8 +53,8 @@ impl TranslationUnit {
 
         let mut tu_ptr: clang_sys::CXTranslationUnit = ptr::null_mut();
 
-        unsafe {
-            let result = clang_sys::clang_parseTranslationUnit2(
+        let result = unsafe {
+            clang_sys::clang_parseTranslationUnit2(
                 index.as_ptr(),
                 source_filename_cstr.as_ptr(),
                 command_line_args_ptr_vec.as_ptr(),
@@ -62,14 +63,14 @@ impl TranslationUnit {
                 0,
                 clang_sys::CXTranslationUnit_Flags::from_bits_truncate(flags.bits),
                 &mut tu_ptr,
-            );
+            )
+        };
 
-            let error_code = juice::ErrorCode::from(result);
+        let error_code = juice::ErrorCode::from(result);
 
-            match error_code {
-                juice::ErrorCode::Success => Ok(TranslationUnit::from_ptr(tu_ptr)),
-                _ => Err(error_code),
-            }
+        match error_code {
+            juice::ErrorCode::Success => Ok(TranslationUnit::from_ptr(tu_ptr)),
+            _ => Err(error_code),
         }
     }
 
@@ -79,6 +80,12 @@ impl TranslationUnit {
 
     pub fn as_mut_ptr(&mut self) -> &mut clang_sys::CXTranslationUnit {
         &mut self.ptr
+    }
+
+    pub fn get_cursor(&self) -> cursor::Cursor {
+        unsafe {
+            cursor::Cursor::from_obj(clang_sys::clang_getTranslationUnitCursor(self.ptr))
+        }
     }
 }
 
