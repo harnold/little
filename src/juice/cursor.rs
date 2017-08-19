@@ -5,7 +5,7 @@ use libc::c_void;
 use std::any::Any;
 
 #[repr(i32)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum Kind {
 
     // Declarations
@@ -440,10 +440,60 @@ pub enum Kind {
 
 const FIRST_DECL: i32 = Kind::UnexposedDecl as i32;
 const LAST_DECL: i32 = Kind::CXXAccessSpecifier as i32;
+const FIRST_REF: i32 = Kind::ObjCSuperClassRef as i32;
+const LAST_REF: i32 = Kind::VariableRef as i32;
+const FIRST_INVALID: i32 = Kind::InvalidFile as i32;
+const LAST_INVALID: i32 = Kind::InvalidCode as i32;
+const FIRST_EXPR: i32 = Kind::UnexposedExpr as i32;
+const LAST_EXPR: i32 = Kind::ObjCAvailabilityCheckExpr as i32;
+const FIRST_STMT: i32 = Kind::UnexposedStmt as i32;
+const LAST_STMT: i32 = Kind::OMPTargetTeamsDistributeSimdDirective as i32;
+const FIRST_ATTR: i32 = Kind::UnexposedAttr as i32;
+const LAST_ATTR: i32 = Kind::DLLImport as i32;
+const FIRST_PREPROCESSING: i32 = Kind::PreprocessingDirective as i32;
+const LAST_PREPROCESSING: i32 = Kind::InclusionDirective as i32;
+const FIRST_EXTRA_DECL: i32 = Kind::ModuleImportDecl as i32;
+const LAST_EXTRA_DECL: i32 = Kind::FriendDecl as i32;
 
 impl Kind {
     pub fn is_declaration(self) -> bool {
-        self as i32 >= FIRST_DECL && self as i32 <= LAST_DECL
+        (self as i32 >= FIRST_DECL && self as i32 <= LAST_DECL) ||
+        (self as i32 >= FIRST_EXTRA_DECL && self as i32 <= LAST_EXTRA_DECL)
+    }
+
+    pub fn is_reference(self) -> bool {
+        self as i32 >= FIRST_REF && self as i32 <= LAST_REF
+    }
+
+    pub fn is_invalid(self) -> bool {
+        self as i32 >= FIRST_INVALID && self as i32 <= LAST_INVALID
+    }
+
+    pub fn is_expression(self) -> bool {
+        self as i32 >= FIRST_EXPR && self as i32 <= LAST_EXPR
+    }
+
+    pub fn is_statement(self) -> bool {
+        self as i32 >= FIRST_STMT && self as i32 <= LAST_STMT
+    }
+
+    pub fn is_translation_unit(self) -> bool {
+        self == Kind::TranslationUnit
+    }
+
+    pub fn is_attribute(self) -> bool {
+        self as i32 >= FIRST_ATTR && self as i32 <= LAST_ATTR
+    }
+
+    pub fn is_preprocessing(self) -> bool {
+        self as i32 >= FIRST_PREPROCESSING && self as i32 <= LAST_PREPROCESSING
+    }
+
+    pub fn is_unexposed(self) -> bool {
+        (self as i32 == Kind::UnexposedDecl as i32) ||
+        (self as i32 == Kind::UnexposedExpr as i32) ||
+        (self as i32 == Kind::UnexposedStmt as i32) ||
+        (self as i32 == Kind::UnexposedAttr as i32)
     }
 }
 
