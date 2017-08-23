@@ -1,7 +1,7 @@
-use juice;
-use juice::cursor;
-use juice::index;
-use juice::util;
+// use juice;
+use cursor;
+use index;
+use util;
 
 use clang_sys;
 use std::ptr;
@@ -39,7 +39,7 @@ impl TranslationUnit {
         command_line_args: I,
         // unsaved_file: ...
         flags: Flags,
-    ) -> Result<TranslationUnit, juice::ErrorCode>
+    ) -> Result<TranslationUnit, ::ErrorCode>
     where
         I: IntoIterator<Item = &'a str>,
     {
@@ -66,10 +66,10 @@ impl TranslationUnit {
             )
         };
 
-        let error_code = juice::ErrorCode::from(result);
+        let error_code = ::ErrorCode::from(result);
 
         match error_code {
-            juice::ErrorCode::Success => Ok(TranslationUnit::from_ptr(tu_ptr)),
+            ::ErrorCode::Success => Ok(TranslationUnit::from_ptr(tu_ptr)),
             _ => Err(error_code),
         }
     }

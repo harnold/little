@@ -1,7 +1,4 @@
-#[macro_use]
-extern crate bitflags;
-extern crate clang_sys;
-extern crate libc;
+extern crate juice;
 
 use std::any::Any;
 use std::env;
@@ -51,7 +48,7 @@ fn print_options(options: &Options) {
     println!("file: {}", options.file);
 }
 
-pub mod juice;
+// pub mod juice;
 
 struct EmptyData {}
 

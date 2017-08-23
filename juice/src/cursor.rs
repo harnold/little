@@ -1,4 +1,4 @@
-use juice;
+// use juice;
 
 use clang_sys;
 use libc::c_void;
@@ -560,9 +560,9 @@ impl Cursor {
         unsafe { Kind::from(clang_sys::clang_getCursorKind(self.obj)) }
     }
 
-    pub fn display_name(&self) -> juice::String {
+    pub fn display_name(&self) -> ::String {
         let s = unsafe { clang_sys::clang_getCursorDisplayName(self.obj) };
-        juice::String::from(s)
+        ::String::from(s)
     }
 
     pub fn visit_children<T: Any>(

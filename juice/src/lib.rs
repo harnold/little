@@ -1,10 +1,13 @@
+#[macro_use]
+extern crate bitflags;
+extern crate clang_sys;
+extern crate libc;
+
 pub mod cursor;
 pub mod index;
 pub mod tu;
 mod util;
 
-use clang_sys;
-use libc;
 use std::ffi;
 use std::str;
 
