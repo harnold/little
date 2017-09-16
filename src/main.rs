@@ -1,117 +1,84 @@
 extern crate juice;
 
-use std::any::Any;
 use std::env;
 
 #[derive(Debug, Default)]
 struct Options {
     path: String,
     file: String,
+    cflags: String,
 }
 
 fn parse_command_line() -> Result<Options, String> {
-
     let mut args = env::args();
     let mut path_arg = None;
     let mut file_arg = None;
+    let mut cflags_arg = None;
 
     args.next();
     while let Some(arg) = args.next() {
         if arg == "-p" || arg == "--path" {
-            path_arg = args.next();
+            path_arg = args.next()
         } else if arg == "-f" || arg == "--file" {
-            file_arg = args.next();
+            file_arg = args.next()
+        } else if arg == "-c" || arg == "--cflags" {
+            cflags_arg = args.next()
         } else {
             return Err(format!("Unknown option: {}", arg));
         }
     }
 
     let mut options = Options::default();
-
-    if let Some(path) = path_arg {
-        options.path = path;
-    } else {
-        return Err(String::from("No path specified (`--path')."));
-    }
-
-    if let Some(file) = file_arg {
-        options.file = file;
-    } else {
-        return Err(String::from("No file specified (`--file')."));
-    }
-
+    options.path = path_arg.ok_or(String::from("No path specified (`--path')."))?;
+    options.file = file_arg.ok_or(String::from("No file specified (`--file')."))?;
+    options.cflags = cflags_arg.ok_or(String::from("No compiler flags specified (`--cflags')."))?;
     Ok(options)
 }
 
 fn print_options(options: &Options) {
-    println!("path: {}", options.path);
-    println!("file: {}", options.file);
+    println!("{:?}", options)
 }
 
-// pub mod juice;
+use juice::index;
+use juice::tu;
 
-struct EmptyData {}
-
-fn print_declaration(
-    cursor: juice::cursor::Cursor,
-    _: juice::cursor::Cursor,
-    _: &mut Any
-) -> juice::cursor::ChildVisitResult {
-
-    if cursor.kind().is_declaration() {
-        let display_name = cursor.display_name();
-        println!("{}", display_name.to_str());
-    }
-
-    juice::cursor::ChildVisitResult::Continue
-}
-
-fn parse_source_file(source_filename: String) -> Result<(), String> {
-
-    let clang_args_str = "";
-    let clang_args: Vec<_> = clang_args_str.split_whitespace().collect();
-
-    let index = juice::index::Index::create(
-        juice::index::EXCLUDE_DECLARATIONS_FROM_PCH |
-        juice::index::DISPLAY_DIAGNOSTICS);
+fn run(options: &Options) -> Result<(), String> {
+    let clang_args: Vec<_> = options.cflags.split_whitespace().collect();
+    let index = index::Index::create(index::Options::empty());
 
     println!("Parsing source file...");
 
-    let result = juice::tu::TranslationUnit::parse(
-        &index,
-        &source_filename,
-        clang_args,
-        juice::tu::SKIP_FUNCTION_BODIES
-    );
+    let result =
+        juice::tu::TranslationUnit::parse(&index, &options.file, clang_args, tu::Flags::empty());
 
-    match result {
-        Ok(tu) => {
-            let cursor = tu.get_cursor();
-            let mut data = EmptyData {};
-            cursor.visit_children(print_declaration, &mut data);
-            Ok(())
-        },
-        Err(error_code) => {
-            Err(String::from(error_code.description()))
-        }
+    let tu = match result {
+        Ok(tu) => tu,
+        Err(error_code) => return Err(String::from(error_code.description())),
+    };
+
+    let diagnostics = tu.get_diagnostics();
+
+    for diag in diagnostics {
+        println!(">> {}", diag.spelling().to_str())
     }
+
+    Ok(())
 }
 
 fn main() {
     println!("This is little!");
 
     let options = match parse_command_line() {
-        Ok(options) => {
-            print_options(&options);
-            options
-        }
+        Ok(options) => options,
         Err(err) => {
             println!("Error: {}", err);
             return;
         }
     };
 
-    match parse_source_file(options.file) {
+    print_options(&options);
+
+    match run(&options) {
         Ok(_) => println!("Success."),
         Err(err) => println!("Error: {}", err),
     };
