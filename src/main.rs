@@ -39,8 +39,19 @@ fn print_options(options: &Options) {
     println!("{:?}", options)
 }
 
+use juice::diagnostic;
 use juice::index;
 use juice::tu;
+
+fn severity_string(s: diagnostic::Severity) -> &'static str {
+    match s {
+        diagnostic::Severity::Ignored => "ignored",
+        diagnostic::Severity::Note => "note",
+        diagnostic::Severity::Warning => "warning",
+        diagnostic::Severity::Error => "error",
+        diagnostic::Severity::Fatal => "fatal"
+    }
+}
 
 fn run(options: &Options) -> Result<(), String> {
     let clang_args: Vec<_> = options.cflags.split_whitespace().collect();
@@ -48,8 +59,7 @@ fn run(options: &Options) -> Result<(), String> {
 
     println!("Parsing source file...");
 
-    let result =
-        juice::tu::TranslationUnit::parse(&index, &options.file, clang_args, tu::Flags::empty());
+    let result = tu::TranslationUnit::parse(&index, &options.file, clang_args, tu::Flags::empty());
 
     let tu = match result {
         Ok(tu) => tu,
@@ -59,7 +69,14 @@ fn run(options: &Options) -> Result<(), String> {
     let diagnostics = tu.get_diagnostics();
 
     for diag in diagnostics {
-        println!(">> {}", diag.spelling().to_str())
+        let loc = diag.location().spelling_location();
+        println!("{}:{}:{}: {}: {}",
+            loc.file.file_name().to_str(),
+            loc.line,
+            loc.column,
+            severity_string(diag.severity()),
+            diag.spelling().to_str()
+        )
     }
 
     Ok(())
